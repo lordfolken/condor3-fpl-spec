@@ -10,7 +10,8 @@ Unofficial, reverse-engineered community documentation for the **Condor 3** flig
 | [`spec-validation/validate_fpl.py`](spec-validation/validate_fpl.py) | Validator against the spec key inventory |
 | [`spec-validation/samples/`](spec-validation/samples/) | Annotated `.fpl` samples (install, race, local, condor.club) |
 | [`docs/xcsoar-ref/`](docs/xcsoar-ref/) | XCSoar Condor device driver excerpts (task import is via CoTaCo, not native `.fpl`) |
-| [`docs/xcsoar-issue-per-tp-altitude-limits.md`](docs/xcsoar-issue-per-tp-altitude-limits.md) | Draft GitHub issue: altitude limit gaps for Condor → XCSoar |
+
+Related XCSoar discussion: [per-turnpoint altitude limits (Condor / CoTaCo import gap)](https://github.com/XCSoar/XCSoar/issues/2658).
 
 ## Status
 
