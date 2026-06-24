@@ -1,0 +1,15 @@
+# Validation scratch / fetched pages
+spec-validation/task28133.html
+spec-validation/rss.xml
+spec-validation/validation_report.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
