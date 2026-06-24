@@ -2,7 +2,7 @@
 
 **Status:** Unofficial, reverse-engineered community specification  
 **Scope:** **Condor 3 only** (version codes `3000`, `3100`) — Condor 1/2 are out of scope (see Appendix C)  
-**Last updated:** 2026-06-24 (32 C3 samples validated; §8 coordinate system expanded)  
+**Last updated:** 2026-06-24 (32 C3 samples validated; unit encoding cross-checked via `winch.fpl` UI export)  
 **Authors:** Synthesized from Condor 3 samples, the C3 user guide, CondorUTill tools, and forum reports
 
 ---
@@ -248,8 +248,8 @@ Zones begin moving when the server/flight starts **confirmed (forum)**.
 | `ThermalsStreeting` | integer | — | Cloud/thermal streeting | observed |
 | `ThermalsBugs` | integer | — | Bug accumulation rate (XC option) | observed |
 | `WavesStability` | integer | — | Mountain wave stability | observed |
-| `WavesMoisture` | integer | — | Wave moisture / lenticular formation | observed |
-| `HighCloudsCoverage` | integer | — | High cloud amount slider | observed |
+| `WavesMoisture` | integer | 0–10 | Wave moisture slider; UI displays as **percent** (`8` → 80%) | observed |
+| `HighCloudsCoverage` | integer | 0–8 | High cloud slider; UI displays as **octas** (`2` → 2/8) | observed |
 
 FPLCheck can compute cloud base from `[WeatherZone0]` thermal data and departure airfield elevation for validation rules.
 
@@ -280,10 +280,10 @@ Race timing, realism, penalties, and feature toggles.
 
 | Key | Type | Units | Description | Source |
 |-----|------|-------|-------------|--------|
-| `TaskDate` | integer | — | Excel serial date from 1899-12-30 **inferred** (`46174` ≈ 2026-06-24) | observed |
+| `TaskDate` | integer | — | Days since **1899-12-30** (Delphi/Excel-style serial; `46194` = 2026-06-21 **validated**) | observed |
 | `StartTime` | float | hours | Local task start time (e.g. `13`, `12.5` = 12:30) **validated:** `12.5` in condor.club race replay | confirmed |
 | `StartTimeWindow` | float | hours | Start gate open duration (`0` = instant close **observed**) | confirmed |
-| `RaceStartDelay` | float | hours | “Race in” delay before timing starts (`0.01666…` ≈ 1 min) | observed |
+| `RaceStartDelay` | float | hours | Delay before race timing starts; stored as **decimal hours** (`0.01666…` ≈ 1 min; `0.16666…` ≈ 10 min **validated**) | observed |
 
 #### Task type
 
@@ -302,7 +302,7 @@ When `AAT=1`, intermediate turnpoints typically use large `TPRadius` (e.g. 15000
 | `StartHeight` | float | m | Start gate reference height (AGL **inferred**) | confirmed |
 | `MaxStartGroundSpeed` | float | km/h | Maximum ground speed crossing start | observed |
 | `RopeLength` | float | m | Aero-tow rope length | observed |
-| `BreakProb` | float | — | Tow rope break probability (`0` = off) | observed |
+| `BreakProb` | float | % | Winch cable break probability; stored as **whole-number percent** (`44` = 44%; not `0.44`) | observed |
 
 #### Helpers and visibility
 
@@ -446,7 +446,7 @@ When `StartType=1`:
 
 | Key | Role |
 |-----|------|
-| `BreakProb` | Probability of winch cable break (`0` = never, **confirmed UI**) |
+| `BreakProb` | Winch cable break probability as **whole-number percent** (`44` = 44%; `0` = never, **confirmed UI**) |
 | `RopeLength` | Still present in `winch.fpl` (`50` m) — may mirror aerotow rope UI field or be unused for winch |
 
 ### Example: winch launch (`winch.fpl`)
@@ -458,9 +458,10 @@ PZCount=3                 ← three penalty zones (indices 0–2)
 WZCount=3                 ← base + two moving weather zones
 StartType=1               ← winch
 StartHeight=700
-BreakProb=0
+BreakProb=44
 RopeLength=50
 RandomizeWeatherOnEachFlight=1
+RaceStartDelay=0.16666667163372   ← 10 min (hours)
 ```
 
 Penalty zones use default vertical span `PZBase=0`, `PZTop=10000`, `PZPenaltyTimeFactor=5` per zone. Weather zone 2 has `ThermalsOverdevelopment=1`.
@@ -489,7 +490,7 @@ The same grid is used everywhere geometry appears in the file: turnpoints, penal
 |-------|------|---------|
 | `TPPosZ{i}` | m | **Terrain elevation MSL** at the turnpoint XY **observed** |
 | `PZBase{z}`, `PZTop{z}` | m | Penalty-zone floor/ceiling altitude MSL |
-| `TPAltitude{i}` | m | Sector minimum altitude (task rule, not terrain height) |
+| `TPAltitude{i}` | m | Window sector: vertical centre MSL; also stored on Classic sectors (default 1500) — **altitude band on Classic is `TPWidth`/`TPHeight`, not `TPAltitude`** |
 
 `TPPosZ` is stored in the file and matches ground height at the XY location; it is not a pilot-selected value.
 
