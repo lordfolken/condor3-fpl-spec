@@ -1,8 +1,8 @@
 # Condor Soaring Simulator — `.fpl` Flight Plan Format
 
 **Status:** Unofficial, reverse-engineered community specification  
-**Scope:** **Condor 3 only** (version codes `3000`, `3100`) — Condor 1/2 are out of scope (see Appendix C)  
-**Last updated:** 2026-06-24 (32 C3 samples validated; unit encoding cross-checked via `winch.fpl` UI export)  
+**Scope:** **Condor 3 only** (version codes `3000`, `3050`, `3100`) — Condor 1/2 are out of scope (see Appendix C)  
+**Last updated:** 2026-09-18 (37 C3 samples; condor.club gap download: Window mix, `TPAngle=1000+TaskID`, `PZCount=6`, version `3050`)  
 **Authors:** Synthesized from Condor 3 samples, the C3 user guide, CondorUTill tools, and forum reports
 
 ---
@@ -61,9 +61,10 @@ Related formats: `.sfl` (flight plan **list** — stores references to `.fpl` fi
 | Code | Release | Notes |
 |------|---------|-------|
 | `3000` | 3.0.0 | Observed on early C3 install defaults (Slovenia3) |
+| `3050` | 3.0.5 | Observed on condor.club Window-heavy export `#28294` |
 | `3100` | 3.1.0 | Most C3 samples (local saves, race replays, condor.club exports) |
 
-Encoding: **inferred** — `major * 1000 + minor * 100 + patch * 10` (e.g. 3.1.0 → 3100).
+Encoding: **inferred** — `major * 1000 + minor * 100 + patch * 10` (e.g. 3.1.0 → 3100; 3.0.5 → 3050). Treat `3000–3999` as Condor 3.
 
 ### Condor 3 section layout
 
@@ -136,7 +137,7 @@ Defines landscape, turnpoints, penalty zones, and disabled airspace regions.
 | `TaskVersion` | integer | Task schema version | observed (condor.club exports) |
 | `TaskID` | integer | Online task ID (condor.club network ID) | observed (condor.club exports) |
 | `TaskName` | string | Human-readable task name | observed (condor.club exports) |
-| `DesignatedTime` | float | AAT designated task time in minutes | observed (Sierradlv AAT) |
+| `DesignatedTime` | float | AAT designated task time in **minutes**. Same duration as `[GameOptions] AATTime` (hours) when both are present (`90` min ↔ `1.5` h on Sierradlv). Club/condor.club AAT exports may write both; local planner AAT samples write `AATTime` only | observed (Sierradlv AAT) |
 
 **DisabledAirspaces:** Comma-separated list with no spaces in samples. Empty list = all airspaces active. A long list of all IDs (0…1317) = all airspaces disabled (common for online/club tasks). **Validated:** partial lists also occur — e.g. `1082,1194,1208,1209,1235,1310,1311,1337,1338` in a condor.club race replay with one penalty zone, disabling only selected volumes rather than all airspaces.
 
@@ -158,7 +159,7 @@ For each index `i` where `0 ≤ i < Count`, the following keys exist:
 | `TPAltitude{i}` | float | m MSL | Window sector: vertical centre; also stored for Classic | confirmed |
 | `TPWidth{i}` | float | m | Classic: min altitude MSL **or** Window: horizontal width | confirmed |
 | `TPHeight{i}` | float | m | Classic: max altitude MSL **or** Window: vertical height | confirmed |
-| `TPAzimuth{i}` | float/enum | deg | Window sector: entry direction (N=0, NE, E, …) | confirmed |
+| `TPAzimuth{i}` | float | rad or deg | Window entry direction; **mixed encoding**. Radians (`0` = North) are common (`0.785398…` = π/4 NE). condor.club Window tasks may instead store **45° compass steps** (`45`, `90`, …) in the same file as radian values (`#28294`). UI compass labels (N, NE, …) are display-only. Classic start may also store radians (`3.8397…` ≈ 220°, MontBlanc) | observed |
 
 **FPLCheck altitude aliases** (Classic sectors only):
 
@@ -290,9 +291,9 @@ Race timing, realism, penalties, and feature toggles.
 | Key | Type | Description | Source |
 |-----|------|-------------|--------|
 | `AAT` | 0\|1 | `1` = Assigned Area Task | confirmed |
-| `AATTime` | float | hours | AAT minimum time (e.g. `1.25` = 1 h 15 min) | confirmed |
+| `AATTime` | float | AAT minimum time in **hours** (e.g. `1.25` = 1 h 15 min). Same duration as `[Task] DesignatedTime` (minutes) when both are present | confirmed |
 
-When `AAT=1`, intermediate turnpoints typically use large `TPRadius` (e.g. 15000 m) **validated** in `Lesce AAT task.fpl` (zones 2–3 at 15000 m, finish at 1000 m). `PenaltyLowFinish=0` also observed in that AAT sample.
+When `AAT=1`, intermediate turnpoints typically use large `TPRadius` (e.g. 15000 m) **validated** in `Lesce AAT task.fpl` (zones 2–3 at 15000 m, finish at 1000 m). `PenaltyLowFinish=0` also observed in that AAT sample. Club AAT (`Sierradlv`): `DesignatedTime=90` and `AATTime=1.5` (90 min). Local AAT has `AATTime=1.25` and no `DesignatedTime`.
 
 #### Launch / start
 
@@ -382,7 +383,7 @@ Tasks may omit separate takeoff if using non-airport starts **inferred**. AAT ta
 | File value | UI name | Geometry keys used |
 |------------|---------|-------------------|
 | `0` | Classic | `TPRadius`, `TPAngle`, `TPWidth` (min MSL), `TPHeight` (max MSL) |
-| `1` | Window | `TPAltitude` (centre MSL), `TPWidth` (width m), `TPHeight` (height m), `TPAzimuth` |
+| `1` | Window | `TPAltitude` (centre MSL), `TPWidth` (width m), `TPHeight` (height m), `TPAzimuth` (**radians**, §6.4) |
 
 UI documentation labels Classic=1, Window=2 (1-based); **file format is 0-based observed**.
 
@@ -398,22 +399,26 @@ UI documentation labels Classic=1, Window=2 (1-based); **file format is 0-based 
 - **Altitude:** Vertical centre MSL (default 1500)
 - **Width:** Horizontal width m (default 100)
 - **Height:** Vertical extent m (default 100)
-- **Azimuth:** Entry heading (N, NE, E, SE, S, SW, W, NW)
+- **Azimuth:** UI compass (N, NE, E, SE, S, SW, W, NW). **File encoding is mixed:** radians (`0` = North) *or* integer 45° steps. Same-file mix **validated** in `downloads_AA3_28294_windows_12tp.fpl` (10 Window TPs: `45` on TP1–4, then `1.5708` / `0.7854` / `3.9270` / `4.7124` = E / NE / SW / W). Install default Window sample remains `TPAzimuth4=0.785398…` (π/4) on Postojna. Classic `TPRadius`/`TPAngle` are still written on Window points.
 
 ### 6.5 Airport `TPAngle` encoding (observed, not documented)
 
-Takeoff points (`TPAirport=1`) often carry large `TPAngle` values unrelated to standard sector angles:
+Takeoff points (`TPAirport=1`) use **two writer-dependent encodings** — not a heading field:
+
+| Pattern | Files | Typical source |
+|---------|-------|----------------|
+| `TPAngle0=90` | Planner / install / local saves | Classic default |
+| `TPAngle0 = 1000 + TaskID` | condor.club `.fpl` exports | **validated** on every club file that stores `TaskID` (e.g. `#28294` → `29294`, `#27953` Sierradlv → `28953`, `#28125` Keepit → `29125`) |
 
 ```
-TPAngle0=29098   (UFYBEC / Turtmann, AA3)
-TPAngle0=29080   (Samedan, AA3 race replay)
-TPAngle0=29060   (Interlaken / ARUBEC, AA3)
-TPAngle0=90      (some hand-built AA3 tasks — may differ from condor.club exports)
+TPAngle0=90      (planner default)
+TPAngle0=29294   (condor.club TaskID=28294)
+TPAngle0=29125   (condor.club TaskID=28125)
 ```
 
-**Validated radius range across samples:** 500, 1000, 1500, 3000, 15000 m. **Validated TPAngle values (non-airport):** 90, 180, 360.
+A finish airfield (`TPAirport=1` on `Count-1`) may still use a Classic sector angle (`180` on `#28294` TP11) rather than `1000+TaskID`. Older club saves without a `TaskID` key still carry 29xxx takeoff angles consistent with `1000 +` the numeric club id (e.g. `29098`).
 
-**Hypothesis (inferred):** Encodes runway heading or airport start cylinder orientation in an internal unit (possibly centidegrees or packed integer). Treat as opaque unless reverse-engineered via `NaviCon.dll`.
+**Validated `TPRadius` values across C3 samples:** 500, 700, 1000, 1500, 1600, 2000, 3000, 4000, 5000, 10000, 12000, 15000, **18000**, **80000** m. UI Classic range is 0–5000 m; 10000 m+ appear on AAT cylinders (`80000` = 80 km on `#28362`). **Validated TPAngle values (non-airport):** 90, 180, 360.
 
 ### 6.6 Line finish (observed)
 
@@ -761,7 +766,7 @@ Derived from `Documents\Condor3\FlightPlans\c3sim.fpl`.
 | Condor 3 Flight Planner | Yes | Yes | Authoritative writer |
 | [CoTaCo](https://condorutill.fr/CoTaCo.html) | Yes | Yes (from `.cup` + Template.fpl) | C3; exports TSK/LKT/CUP/JSON |
 | [FPLCheck](https://condorutill.fr/FPLCheck/FPLCheck_README.txt) | Validate | No | Rule files use FPL syntax |
-| `validate_fpl.py` (this repo) | Validate | No | C3-focused key inventory check |
+| `validate_fpl.py` (this repo) | Validate | No | C3 key inventory, indexed completeness, numeric types |
 
 ---
 
@@ -787,7 +792,7 @@ Derived from `Documents\Condor3\FlightPlans\c3sim.fpl`.
 
 ### Validation corpus (`spec-validation\samples\`)
 
-See §14 for the full 12-file inventory used in the 2026-06-24 validation pass (expanded from FlightPlans and Downloads).
+See §14 for the full 37-file C3 inventory (plus one Condor 1 reference file for regression).
 
 ### Additional local files (not copied to validation set)
 
@@ -823,10 +828,10 @@ These coordinates are WGS84 degrees/minutes; convert separately to `.fpl` landsc
 
 ---
 
-## 14. Validated against 32 Condor 3 samples
+## 14. Validated against 37 Condor 3 samples
 
 **Scope:** Condor 3 only (`3000`, `3100`). One Condor 1 reference file (`1150`) is kept in the corpus for regression but excluded from C3 statistics below.  
-**Validation date:** 2026-06-24 (32 C3 samples after `winch.fpl`)  
+**Validation date:** 2026-06-24 corpus; unit/structure claims re-checked 2026-09-18; five condor.club gap tasks added the same day (`#28294`, `#28345`, `#28348`, `#28353`, `#28362`)  
 **Sample directory:** `Documents\Condor3\spec-validation\samples\`  
 **Validation script:** `python spec-validation\validate_fpl.py --c3-only`
 
@@ -866,6 +871,11 @@ These coordinates are WGS84 degrees/minutes; convert separately to `.fpl` landsc
 | `downloads\downloads_Japan-Shikoku3_18m_6tp.fpl` | Downloads (condor.club #28126) | 3100 | **Japan-Shikoku3** | 6 | 0 | 2 | Small cylinders (`TPRadius=500` m) |
 | `downloads\downloads_Sierradlv_AAT_6tp.fpl` | Downloads (CIAC day #6) | 3100 | **Sierradlv** | 6 | **1** | 1 | **`DesignatedTime=90`**; `AATTime=1.5` |
 | `downloads\downloads_AA3_MontBlanc_7tp.fpl` | Downloads (condor.club) | 3100 | AA3 | 7 | 0 | 1 | Tour du Mont Blanc; `StartType=0` |
+| `downloads\downloads_AA3_28294_windows_12tp.fpl` | condor.club `#28294` (Window search) | **3050** | AA3 | 12 | 0 | 1 | **10 Window TPs**; mixed `TPAzimuth` 45° and radians; takeoff `TPAngle=29294` |
+| `downloads\downloads_Slovenia3_28345_winch_5tp.fpl` | condor.club `#28345` (winch search) | 3100 | Slovenia3 | 5 | 0 | 2 | Club **`StartType=1`**; `TPAngle0=29345` |
+| `downloads\downloads_Palmeira_28348_AAT_6tp.fpl` | condor.club `#28348` (AAT/S) | 3100 | **Palmeira** | 6 | **1** | 1 | Non-AA3/Slovenia3 AAT; `DesignatedTime=90` = `AATTime=1.5` |
+| `downloads\downloads_AA3_28353_AAT_6tp.fpl` | condor.club `#28353` (AAT/S) | 3100 | AA3 | 6 | **1** | 1 | `DesignatedTime=195` = `AATTime=3.25`; AAT radius **18000** m; ISO-8859-1 name |
+| `downloads\downloads_AA3_28362_AAT_pz6_5tp.fpl` | condor.club `#28362` (PZ + AAT/S) | 3100 | AA3 | 5 | **1** | 2 | **`PZCount=6`**; AAT cylinder **80000** m; `DesignatedTime=180` = `AATTime=3` |
 
 **Disk scan (2026-06-24):** Searched `Documents\Condor3\`, `C:\Condor3\`, `Downloads\`, and `Documents\Condor\` (C2 — not present). Found 46 non-corpus `.fpl` files; **12 byte-identical** to existing samples (skipped); **2 empty** condor.club stubs in `Downloads\` (0 bytes — skipped); **20 new unique** copied.
 
@@ -875,7 +885,7 @@ These coordinates are WGS84 degrees/minutes; convert separately to `.fpl` landsc
 
 ### 14.2 Sections observed (C3)
 
-Across all 31 Condor 3 samples:
+Across all 37 Condor 3 samples:
 
 `[Version]`, `[Task]`, `[Weather]`, `[WeatherZone0]` … `[WeatherZone2]` (when `WZCount≥3`), `[Plane]`, `[GameOptions]`, `[Description]`
 
@@ -889,8 +899,8 @@ All keys in C3 samples match §5 or indexed patterns. **`DesignatedTime`** docum
 |---------|--------|
 | `TPSectorType` | `0` (Classic) and **`1` (Window)** observed |
 | `TPSectorDirection` | Always `0` in C3 |
-| Penalty zones | **`PZCount=1`** in race replay; **`PZCount=3`** in `winch.fpl` — full `PZPos*`/`PZBase`/`PZTop`/`PZPenaltyTimeFactor` for indices 0–2 |
-| `PZPenaltyTimeFactor` | **5** (default UI) in `winch.fpl`; other samples use task-level penalties |
+| Penalty zones | **`PZCount=1`** (race), **`3`** (`winch.fpl`), **`6`** (`#28362` club AAT) — full `PZPos*`/`PZBase`/`PZTop`/`PZPenaltyTimeFactor` |
+| `PZPenaltyTimeFactor` | **5** (default UI) in `winch.fpl` and all six `#28362` zones |
 | `RandSeed` | Positive integers in all C3 samples |
 | `PenaltyAirspaceEnterance` | Values 100, 120, 200, 210 observed |
 | `WindUpperSpeed` | `0` in some zones; up to `16.667` m/s in AA3 |
@@ -899,24 +909,26 @@ All keys in C3 samples match §5 or indexed patterns. **`DesignatedTime`** docum
 | `HighCloudsCoverage` | Range 1–5 |
 | `Polygon{N}X/Y` | Up to **12** vertices (`PointCount=12`, LakeKeepitC3) |
 | `[Task]` metadata | `TaskVersion`/`TaskID`/`TaskName` on condor.club exports |
-| `StartType` | **`0`** aerotow, **`1`** winch, **`2`** airborne/airstart **confirmed** |
+| `StartType` | **`0`** aerotow, **`1`** winch (including club `#28345`), **`2`** airborne/airstart **confirmed** |
 | `StartHeight` | **410**, 680, 700, **1000**, **1400**, 1500 observed |
-| Landscapes | **AA3**, **CW-Swiss**, **Japan-Shikoku3**, **LakeKeepitC3**, **Sierradlv**, **Slovenia3** |
-| Turnpoint count | **2**–**9** |
-| `TPRadius` | **500**–**15000** m |
-| AAT | **Slovenia3** and **Sierradlv** (`DesignatedTime` on Sierradlv) |
+| Landscapes | **AA3**, **CW-Swiss**, **Japan-Shikoku3**, **LakeKeepitC3**, **Palmeira**, **Sierradlv**, **Slovenia3** |
+| Turnpoint count | **2**–**12** |
+| `TPRadius` | **500**–**80000** m (AAT `#28362` 80 km; Classic UI still 0–5000) |
+| `TPAzimuth` | Mixed: radians and 45° steps; 10 Window TPs in `#28294` |
+| AAT | Slovenia3, Sierradlv, Palmeira, AA3 club; `DesignatedTime` min = `AATTime` h (`90/1.5`, `180/3`, `195/3.25`) |
+| Airport `TPAngle` | Planner `90`; club takeoff **`1000 + TaskID`** |
 | `WZCount` | **1**, **2**, and **3** observed; `BorderWidth` up to **12000** m (`winch.fpl` zone 1) |
 | `MoveSpeed` | Up to **13.889** m/s (~50 km/h) in `winch.fpl` weather zone 1 |
 
 ### 14.4 Spec claims confirmed
 
 - INI structure with indexed turnpoint keys (`TPName0`…`TPName{N-1}`)
-- Version code mapping (`3000`, `3100`)
+- Version code mapping (`3000`, `3050`, `3100`)
 - C3 weather zone model with `WZCount` matching zone section count (up to 3 zones validated)
-- Airport `TPAngle` opaque encoding (large values on takeoff points)
-- AAT large-radius turnpoints and **`DesignatedTime`** on club AAT tasks
-- Window sector geometry (`TPSectorType=1`, `TPWidth`, `TPHeight`, `TPAzimuth`)
-- Penalty zone quadrilateral + altitude + factor fields (**multi-zone `PZCount=3` validated in `winch.fpl`**)
+- Airport `TPAngle`: planner default `90`; condor.club takeoff **`1000 + TaskID`**
+- AAT large-radius turnpoints; **`DesignatedTime` (minutes) = `AATTime` (hours)** on club AAT
+- Window sector geometry (`TPSectorType=1`); azimuth **radians and/or 45° steps**
+- Penalty zone quadrilateral + altitude + factor fields (**`PZCount=6` validated in `#28362`**)
 - Multi-zone weather with moving polygons and overdevelopment (`winch.fpl`)
 - condor.club task references in `[Description] Text` and `TaskID`/`TaskName`
 
@@ -924,18 +936,27 @@ All keys in C3 samples match §5 or indexed patterns. **`DesignatedTime`** docum
 
 | Item | Status |
 |------|--------|
-| **Airport `TPAngle` encoding** | Opaque (~29098, etc.) — not plain degrees |
-| **`DesignatedTime` vs `AATTime`** | Both present on Sierradlv AAT; relationship unclear |
+| **Window `TPAzimuth` mix** | `#28294` stores both `45` and radian values; club HTML compass labels do not always match the `45`s |
+| **`WZCount` > 3** | Search form has no weather-zone filter; not seen in files downloaded so far |
 | **Ghost / `.ftr` settings** | Not stored in `.fpl` files examined |
 | **Landscapes not in corpus** | Pumalin Park (empty download stub), others |
 | **Plane ballast round-trip** | Forum reports UI may ignore `Water`/`FixedMass`/`CGBias`/`Seat` on load |
-| **`PZCount > 8` in-game** | Forum warns hand-edited values above UI limit may not work (3 zones validated in `winch.fpl`) |
+| **`PZCount > 8` in-game** | Forum warns hand-edited values above UI limit may not work (**6** zones validated in `#28362`) |
 
 ### 14.6 Recommended follow-up (C3)
 
-1. Re-download failed condor.club stubs (Pumalin Park, FGVC day #10) while logged in.
-2. Save the same task from Flight Planner before/after changing ballast to confirm round-trip behaviour.
-3. Run `python validate_fpl.py --c3-only` after adding samples.
+1. Retry condor.club when this host is no longer throttled (empty HTTP 200, then connect timeouts after the 2026-09-18 burst). Logged-in download: `/download2/0/?id=<TaskID>`.
+2. Priority `.fpl` IDs still listed but not in the corpus:
+
+   | Gap | Club IDs |
+   |-----|----------|
+   | Window, non-AA3/Slovenia3 | `28169` West Patagonia 3; `28161` `27504` `26462` AlleghenyRidges3; `27255` `27121` Yunnan; `27096` `25559` Rocky Mountains 2; `25624` NetherlandsHD3; `27929` Temuco Los Andes 3 |
+   | PZ / AAT other landscapes | `28262` AFA; `28091` Bebedouro 2; `27809` Southern Ontario AAT/D; `27894` Eastern Ontario 2; `26970` Borås |
+   | Keepit / Sierra AAT | `27970` `27060` LakeKeepitC3; `28220` `28206` Sierradlv |
+   | Extra club winch | `28319` `28261` `28182` |
+
+3. Save the same task from Flight Planner before/after changing ballast to confirm round-trip behaviour.
+4. Run `python spec-validation/validate_fpl.py --c3-only` after adding samples.
 
 ---
 

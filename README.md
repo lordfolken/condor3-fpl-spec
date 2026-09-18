@@ -7,7 +7,7 @@ Unofficial, reverse-engineered community documentation for the **Condor 3** flig
 | Path | Description |
 |------|-------------|
 | [`FPL-format-spec.md`](FPL-format-spec.md) | Main specification (sections, keys, semantics, samples index) |
-| [`spec-validation/validate_fpl.py`](spec-validation/validate_fpl.py) | Validator against the spec key inventory |
+| [`spec-validation/validate_fpl.py`](spec-validation/validate_fpl.py) | Validator: C3 key inventory, indexed-key completeness, numeric types |
 | [`spec-validation/samples/`](spec-validation/samples/) | Annotated `.fpl` samples (install, race, local, condor.club) |
 | [`docs/xcsoar-ref/`](docs/xcsoar-ref/) | XCSoar Condor device driver excerpts (task import is via CoTaCo, not native `.fpl`) |
 
@@ -15,9 +15,9 @@ Related XCSoar discussion: [per-turnpoint altitude limits (Condor / CoTaCo impor
 
 ## Status
 
-- **Scope:** Condor 3 only (`Condor version=3000` / `3100`)
+- **Scope:** Condor 3 only (`Condor version=3000` / `3050` / `3100`)
 - **Not** published or endorsed by Condor Soaring Ltd.
-- Last spec update: 2026-06-24 (32 C3 samples validated)
+- Last spec update: 2026-09-18 (37 C3 samples; condor.club Window / PZ / AAT gap downloads)
 
 ## Validation
 
